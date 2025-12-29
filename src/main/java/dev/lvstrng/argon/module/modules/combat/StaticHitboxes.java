@@ -8,16 +8,14 @@ import dev.lvstrng.argon.module.setting.ColorSetting;
 import dev.lvstrng.argon.module.setting.ModeSetting;
 import dev.lvstrng.argon.module.setting.NumberSetting;
 import dev.lvstrng.argon.utils.RenderUtils;
-import net.minecraft.client.MinecraftClient;
+import dev.lvstrng.argon.utils.FriendUtils;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.decoration.EndCrystalEntity;
 import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.passive.AnimalEntity;
 import net.minecraft.entity.passive.PassiveEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.entity.projectile.ProjectileEntity;
 import net.minecraft.entity.vehicle.BoatEntity;
 import net.minecraft.entity.vehicle.MinecartEntity;
@@ -54,7 +52,7 @@ public class StaticHitboxes extends Module implements WorldRenderListener {
     private final BooleanSetting others = new BooleanSetting("Others", false);
     private final BooleanSetting self = new BooleanSetting("Self", false);
 
-    // Fill Settings (for Outline and Fill mode)
+    // Fill Settings
     private final NumberSetting fillOpacity = new NumberSetting("Fill Opacity", 0, 255, 40, 1);
 
     public StaticHitboxes() {
@@ -86,11 +84,9 @@ public class StaticHitboxes extends Module implements WorldRenderListener {
         for (Entity entity : mc.world.getEntities()) {
             if (!shouldRender(entity)) continue;
 
+            // Use the entity's bounding box. It's already correctly positioned.
             Box box = entity.getBoundingBox();
-            // Offset the box to render at the entity's eye level for better visual accuracy
-            Vec3d offset = entity.getEyePos().subtract(entity.getPos());
-            Box renderBox = box.offset(offset.x, offset.y, offset.z);
-
+            
             Color color = getColorForEntity(entity);
             
             // Adjust alpha for fill based on setting
@@ -98,120 +94,46 @@ public class StaticHitboxes extends Module implements WorldRenderListener {
 
             switch (mode.getMode()) {
                 case Outline:
-                    RenderUtils.drawOutlineBox(event.getMatrices(), renderBox, color, lineWidth.getValueFloat());
+                    RenderUtils.drawOutlineBox(event.getMatrices(), box, color, lineWidth.getValueFloat());
                     break;
                 case Fill:
-                    RenderUtils.drawFilledBox(event.getMatrices(), renderBox, fillColor);
+                    RenderUtils.drawFilledBox(event.getMatrices(), box, fillColor);
                     break;
                 case OutlineAndFill:
-                    RenderUtils.drawFilledBox(event.getMatrices(), renderBox, fillColor);
-                    RenderUtils.drawOutlineBox(event.getMatrices(), renderBox, color, lineWidth.getValueFloat());
+                    RenderUtils.drawFilledBox(event.getMatrices(), box, fillColor);
+                    RenderUtils.drawOutlineBox(event.getMatrices(), box, color, lineWidth.getValueFloat());
                     break;
             }
         }
     }
 
     private boolean shouldRender(Entity entity) {
-        // Check for self
-        if (entity == mc.player && !self.getValue()) {
-            return false;
-        }
-
-        // Check for friends (assuming a FriendManager exists)
-        if (entity instanceof PlayerEntity && FriendUtils.isFriend((PlayerEntity) entity)) {
-            return friends.getValue();
-        }
-
-        // Check for players
-        if (entity instanceof PlayerEntity) {
+        if (entity == mc.player && !self.getValue()) return false;
+        if (entity instanceof PlayerEntity player) {
+            if (FriendUtils.isFriend(player)) return friends.getValue();
             return players.getValue();
         }
-
-        // Check for hostiles
-        if (entity instanceof HostileEntity) {
-            return hostiles.getValue();
-        }
-
-        // Check for passive mobs (animals, etc.)
-        if (entity instanceof PassiveEntity || entity instanceof AnimalEntity) {
-            return passive.getValue();
-        }
-
-        // Check for items
-        if (entity instanceof ItemEntity) {
-            return items.getValue();
-        }
-
-        // Check for end crystals
-        if (entity instanceof EndCrystalEntity) {
-            return crystals.getValue();
-        }
-
-        // Check for projectiles (arrows, etc.)
-        if (entity instanceof ProjectileEntity && !(entity instanceof EndCrystalEntity)) {
-            return projectiles.getValue();
-        }
-
-        // Check for vehicles
-        if (entity instanceof BoatEntity || entity instanceof MinecartEntity) {
-            return vehicles.getValue();
-        }
-        
-        // Fallback for other entities
+        if (entity instanceof HostileEntity) return hostiles.getValue();
+        if (entity instanceof PassiveEntity || entity instanceof AnimalEntity) return passive.getValue();
+        if (entity instanceof ItemEntity) return items.getValue();
+        if (entity instanceof EndCrystalEntity) return crystals.getValue();
+        if (entity instanceof ProjectileEntity && !(entity instanceof EndCrystalEntity)) return projectiles.getValue();
+        if (entity instanceof BoatEntity || entity instanceof MinecartEntity) return vehicles.getValue();
         return others.getValue();
     }
 
     private Color getColorForEntity(Entity entity) {
-        // Check for self first
-        if (entity == mc.player) {
-            return playersColor.getColor();
-        }
-
-        // Check for friends
-        if (entity instanceof PlayerEntity && FriendUtils.isFriend((PlayerEntity) entity)) {
-            return friendsColor.getColor();
-        }
-
-        // Check for players
-        if (entity instanceof PlayerEntity) {
-            return playersColor.getColor();
-        }
-
-        // Check for hostiles
-        if (entity instanceof HostileEntity) {
-            return hostileColor.getColor();
-        }
-
-        // Check for passive mobs
-        if (entity instanceof PassiveEntity || entity instanceof AnimalEntity) {
-            return passiveColor.getColor();
-        }
-
-        // Check for items
-        if (entity instanceof ItemEntity) {
-            return itemsColor.getColor();
-        }
-
-        // Check for end crystals
-        if (entity instanceof EndCrystalEntity) {
-            return crystalsColor.getColor();
-        }
-
-        // Check for projectiles
-        if (entity instanceof ProjectileEntity) {
-            return projectilesColor.getColor();
-        }
-
-        // Check for vehicles
-        if (entity instanceof BoatEntity || entity instanceof MinecartEntity) {
-            return vehiclesColor.getColor();
-        }
-
-        // Fallback for other entities
+        if (entity == mc.player) return playersColor.getColor();
+        if (entity instanceof PlayerEntity player && FriendUtils.isFriend(player)) return friendsColor.getColor();
+        if (entity instanceof PlayerEntity) return playersColor.getColor();
+        if (entity instanceof HostileEntity) return hostileColor.getColor();
+        if (entity instanceof PassiveEntity || entity instanceof AnimalEntity) return passiveColor.getColor();
+        if (entity instanceof ItemEntity) return itemsColor.getColor();
+        if (entity instanceof EndCrystalEntity) return crystalsColor.getColor();
+        if (entity instanceof ProjectileEntity) return projectilesColor.getColor();
+        if (entity instanceof BoatEntity || entity instanceof MinecartEntity) return vehiclesColor.getColor();
         return otherColor.getColor();
     }
 
-    public enum RenderMode {
-        Outline, Fill, OutlineAndFill
-    }
+    public enum RenderMode { Outline, Fill, OutlineAndFill }
 }
